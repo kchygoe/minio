@@ -128,6 +128,9 @@ ENVIRONMENT VARIABLES:
   GCS credentials file:
      GOOGLE_APPLICATION_CREDENTIALS: Path to credentials.json
 
+  GCS Bucket white list:
+     GCS_BUCKETS: comma separated list of bucket names can be used in gateway
+
 EXAMPLES:
   1. Start minio gateway server for GCS backend.
      {{.Prompt}} {{.EnvVarSetCommand}} GOOGLE_APPLICATION_CREDENTIALS{{.AssignmentOperator}}/path/to/credentials.json
@@ -346,6 +349,19 @@ func isValidGCSProjectIDFormat(projectID string) bool {
 	return gcsProjectIDRegex.MatchString(projectID)
 }
 
+func isBucketNameInList(name string) bool {
+	bucketnames := os.Getenv("GCS_BUCKETS")
+	if len(bucketnames) < 1 {
+		return true
+	}
+	for _, v := range(strings.Split(bucketnames, ",")) {
+		if v == name {
+			return true
+		}
+	}
+	return false
+}
+
 // gcsGateway - Implements gateway for MinIO and GCS compatible object storage servers.
 type gcsGateway struct {
 	minio.GatewayUnsupported
@@ -467,12 +483,13 @@ func (l *gcsGateway) ListBuckets(ctx context.Context) (buckets []minio.BucketInf
 			return buckets, gcsToObjectError(ierr)
 		}
 
-		buckets = append(buckets, minio.BucketInfo{
-			Name:    attrs.Name,
-			Created: attrs.Created,
-		})
+		if isBucketNameInList(attrs.Name) {
+			buckets = append(buckets, minio.BucketInfo{
+				Name:    attrs.Name,
+				Created: attrs.Created,
+			})
+		}
 	}
-
 	return buckets, nil
 }
 
